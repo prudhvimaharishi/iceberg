@@ -20,12 +20,16 @@ package org.apache.iceberg.gcp.gcs;
 
 import com.google.api.client.util.Lists;
 import com.google.api.client.util.Maps;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -83,7 +87,25 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
    *
    * <p>All fields are initialized by calling {@link GCSFileIO#initialize(Map)} later.
    */
-  public GCSFileIO() {}
+  public GCSFileIO() {
+    try {
+      GoogleCredentials credentials =
+          GoogleCredentials.getApplicationDefault()
+              .createScoped(
+                  Collections.singletonList("https://www.googleapis.com/auth/cloud-platform"));
+      GoogleCloudStorageOptions.Builder options = GoogleCloudStorageOptions.builder();
+      options.setProjectId("pbeerelly-test-sandbox-629413");
+      options.setAppName("app");
+      googleCloudStorage =
+          GoogleCloudStorageImpl.builder()
+              .setCredentials(credentials)
+              .setOptions(options.build())
+              .setHttpTransport(null)
+              .build();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   /**
    * Constructor with custom storage supplier.
@@ -93,12 +115,6 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
   public GCSFileIO(SerializableSupplier<Storage> storageSupplier) {
     this.storageSupplier = storageSupplier;
     this.properties = SerializableMap.copyOf(Maps.newHashMap());
-
-    try {
-      googleCloudStorage = GoogleCloudStorageImpl.builder().setHttpTransport(null).build();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   /**
@@ -142,13 +158,10 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
     //    if (!clientForStoragePath(path).storage().delete(BlobId.fromGsUtilUri(path))) {
     //      LOG.warn("Failed to delete path: {}", path);
     //    }
-    System.out.println("I am here");
-    List<String> buckets = Lists.newArrayList();
-    buckets.add(path);
+    StorageResourceId resourceId = new StorageResourceId("pbeerelly-jars", "temp.parquet");
     try {
-      googleCloudStorage.deleteBuckets(buckets);
+      googleCloudStorage.deleteObjects(Collections.singletonList(resourceId));
     } catch (IOException e) {
-      System.out.println(e.getMessage());
       throw new RuntimeException(e);
     }
   }
