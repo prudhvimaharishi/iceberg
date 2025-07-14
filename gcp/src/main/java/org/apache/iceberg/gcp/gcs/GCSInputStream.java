@@ -102,7 +102,11 @@ class GCSInputStream extends SeekableInputStream implements RangeReadable {
     gcpProperties.channelReadChunkSize().ifPresent(result::setChunkSize);
     long end = System.nanoTime();
     long duration = end - start;
-    LOG.info("Inputstream {} Operation read-channel took {} milliseconds for {}.", this.hashCode(), duration / 1_000_000, blobId);
+    LOG.info(
+        "Inputstream {} Operation read-channel took {} milliseconds for {}.",
+        this.hashCode(),
+        duration / 1_000_000,
+        blobId);
 
     return result;
   }
@@ -126,7 +130,12 @@ class GCSInputStream extends SeekableInputStream implements RangeReadable {
     }
     long end = System.nanoTime();
     long duration = end - start;
-    LOG.info("Inputstream {} Operation seek({}) took {} milliseconds for {}.",this.hashCode(), newPos, duration / 1_000_000, this.blobId);
+    LOG.info(
+        "Inputstream {} Operation seek({}) took {} milliseconds for {}.",
+        this.hashCode(),
+        newPos,
+        duration / 1_000_000,
+        this.blobId);
   }
 
   @Override
@@ -141,7 +150,11 @@ class GCSInputStream extends SeekableInputStream implements RangeReadable {
     readOperations.increment();
     long end = System.nanoTime();
     long duration = end - start;
-    LOG.info("Inputstream {} Operation read() took {} milliseconds for {}.", this.hashCode(), duration / 1_000_000, this.blobId);
+    LOG.info(
+        "Inputstream {} Operation read() took {} milliseconds for {}.",
+        this.hashCode(),
+        duration / 1_000_000,
+        this.blobId);
     return singleByteBuffer.array()[0] & 0xFF;
   }
 
@@ -156,7 +169,13 @@ class GCSInputStream extends SeekableInputStream implements RangeReadable {
     readOperations.increment();
     long end = System.nanoTime();
     long duration = end - start;
-    LOG.info("Inputstream {} Operation read(_,{},{}) took {} milliseconds for {}.",this.hashCode(), off,len, duration / 1_000_000, this.blobId);
+    LOG.info(
+        "Inputstream {} Operation read(_,{},{}) took {} milliseconds for {}.",
+        this.hashCode(),
+        off,
+        len,
+        duration / 1_000_000,
+        this.blobId);
     return bytesRead;
   }
 
@@ -173,7 +192,14 @@ class GCSInputStream extends SeekableInputStream implements RangeReadable {
       }
       long end = System.nanoTime();
       long duration = end - start;
-      LOG.info("Inputstream {} Operation readFully({},_,{},{}) took {} milliseconds for {}.",this.hashCode(), position,offset,length,duration / 1_000_000, this.blobId);
+      LOG.info(
+          "Inputstream {} Operation readFully({},_,{},{}) took {} milliseconds for {}.",
+          this.hashCode(),
+          position,
+          offset,
+          length,
+          duration / 1_000_000,
+          this.blobId);
     }
   }
 
@@ -189,7 +215,13 @@ class GCSInputStream extends SeekableInputStream implements RangeReadable {
       int bytesRead = read(readChannel, ByteBuffer.wrap(buffer), offset, length);
       long end = System.nanoTime();
       long duration = end - start;
-      LOG.info("Inputstream {} Operation readTail(_,{},{}) took {} milliseconds for {}.",this.hashCode(), offset,length, duration / 1_000_000, this.blobId);
+      LOG.info(
+          "Inputstream {} Operation readTail(_,{},{}) took {} milliseconds for {}.",
+          this.hashCode(),
+          offset,
+          length,
+          duration / 1_000_000,
+          this.blobId);
       return bytesRead;
     }
   }

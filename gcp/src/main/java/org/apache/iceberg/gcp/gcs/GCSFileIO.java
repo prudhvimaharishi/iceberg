@@ -20,9 +20,12 @@ package org.apache.iceberg.gcp.gcs;
 
 import com.google.api.client.util.Lists;
 import com.google.api.client.util.Maps;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,6 +71,7 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
 
   private SerializableSupplier<Storage> storageSupplier;
   private MetricsContext metrics = MetricsContext.nullMetrics();
+  private GoogleCloudStorage googleCloudStorage;
   private final AtomicBoolean isResourceClosed = new AtomicBoolean(false);
   private SerializableMap<String, String> properties = null;
   // use modifiable collection for Kryo serde
@@ -89,6 +93,12 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
   public GCSFileIO(SerializableSupplier<Storage> storageSupplier) {
     this.storageSupplier = storageSupplier;
     this.properties = SerializableMap.copyOf(Maps.newHashMap());
+
+    try {
+      googleCloudStorage = GoogleCloudStorageImpl.builder().setHttpTransport(null).build();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -129,8 +139,17 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
     // There is no specific contract about whether delete should fail
     // and other FileIO providers ignore failure.  Log the failure for
     // now as it is not a required operation for Iceberg.
-    if (!clientForStoragePath(path).storage().delete(BlobId.fromGsUtilUri(path))) {
-      LOG.warn("Failed to delete path: {}", path);
+    //    if (!clientForStoragePath(path).storage().delete(BlobId.fromGsUtilUri(path))) {
+    //      LOG.warn("Failed to delete path: {}", path);
+    //    }
+    System.out.println("I am here");
+    List<String> buckets = Lists.newArrayList();
+    buckets.add(path);
+    try {
+      googleCloudStorage.deleteBuckets(buckets);
+    } catch (IOException e) {
+      System.out.println(e.getMessage());
+      throw new RuntimeException(e);
     }
   }
 

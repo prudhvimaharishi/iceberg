@@ -93,7 +93,7 @@ class GCSOutputStream extends PositionOutputStream {
     writeOperations.increment();
     long end = System.nanoTime();
     long duration = end - start;
-    LOG.info("Operation write({}) took {} milliseconds for {}.",b, duration / 1_000_000, blobId);
+    LOG.info("Operation write({}) took {} milliseconds for {}.", b, duration / 1_000_000, blobId);
   }
 
   @Override
@@ -105,7 +105,12 @@ class GCSOutputStream extends PositionOutputStream {
     writeOperations.increment();
     long end = System.nanoTime();
     long duration = end - start;
-    LOG.info("Operation write(_,{},{}) took {} milliseconds for {}.",off,len, duration / 1_000_000, blobId);
+    LOG.info(
+        "Operation write(_,{},{}) took {} milliseconds for {}.",
+        off,
+        len,
+        duration / 1_000_000,
+        blobId);
   }
 
   private void openStream() {
