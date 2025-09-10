@@ -711,6 +711,7 @@ project(':iceberg-gcp') {
     api project(':iceberg-api')
     implementation project(':iceberg-common')
     implementation project(':iceberg-core')
+    implementation("com.google.cloud.gcs.analytics:core:1.0.1-SNAPSHOT")
 
     compileOnly platform(libs.google.libraries.bom)
     compileOnly "com.google.cloud:google-cloud-storage"
