@@ -405,6 +405,50 @@ public class TestGCSFileIO {
     }
   }
 
+  @Test
+  public void testGcsFileSystemResolution() {
+    StorageCredential gcsCredential1 =
+        StorageCredential.create(
+            "gs://custom-uri/1",
+            ImmutableMap.of(
+                "gcs.oauth2.token",
+                "gcsTokenFromCredential1",
+                "gcs.oauth2.token-expires-at",
+                "2000"));
+    StorageCredential gcsCredential2 =
+        StorageCredential.create(
+            "gs://custom-uri/2",
+            ImmutableMap.of(
+                "gcs.oauth2.token",
+                "gcsTokenFromCredential2",
+                "gcs.oauth2.token-expires-at",
+                "3000"));
+
+    try (GCSFileIO fileIO = new GCSFileIO()) {
+      fileIO.setCredentials(ImmutableList.of(gcsCredential1, gcsCredential2));
+      fileIO.initialize(
+          ImmutableMap.of(
+              GCS_OAUTH2_TOKEN, "gcsTokenFromProperties", GCS_OAUTH2_TOKEN_EXPIRES_AT, "1000"));
+      PrefixedGcsFileSystem fsRoot = fileIO.gcsFileSystemForStoragePath("gs://custom-uri/");
+      PrefixedGcsFileSystem fs1 = fileIO.gcsFileSystemForStoragePath("gs://custom-uri/1/table1");
+      PrefixedGcsFileSystem fs2 = fileIO.gcsFileSystemForStoragePath("gs://custom-uri/2/table1");
+      PrefixedGcsFileSystem fs1AnotherPath =
+          fileIO.gcsFileSystemForStoragePath("gs://custom-uri/1/table2");
+
+      // Check for object identity to ensure different file systems are used for different prefixes
+      assertThat(fs1).isNotSameAs(fs2).isNotSameAs(fsRoot);
+      assertThat(fs1.getGcsFileSystem())
+          .isNotSameAs(fs2.getGcsFileSystem())
+          .isNotSameAs(fsRoot.getGcsFileSystem());
+      // Verify that the correct prefix is associated with each file system
+      assertThat(fsRoot.getPrefix()).isEqualTo("gs");
+      assertThat(fs1.getPrefix()).isEqualTo("gs://custom-uri/1");
+      assertThat(fs2.getPrefix()).isEqualTo("gs://custom-uri/2");
+      // Ensure paths with the same longest-matching prefix resolve to the same file system instance
+      assertThat(fs1AnotherPath).isSameAs(fs1);
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("org.apache.iceberg.TestHelpers#serializers")
   public void fileIOWithStorageCredentialsSerialization(

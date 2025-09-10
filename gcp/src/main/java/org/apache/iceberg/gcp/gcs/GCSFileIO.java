@@ -37,6 +37,7 @@ import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.metrics.MetricsContext;
+import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTesting;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableList;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
@@ -72,6 +73,7 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
   // use modifiable collection for Kryo serde
   private List<StorageCredential> storageCredentials = Lists.newArrayList();
   private transient volatile Map<String, PrefixedStorage> storageByPrefix;
+  private transient volatile Map<String, PrefixedGcsFileSystem> gcsFileSystemByPrefix;
 
   /**
    * No-arg constructor to load the FileIO dynamically.
@@ -92,17 +94,20 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
 
   @Override
   public InputFile newInputFile(String path) {
-    return GCSInputFile.fromLocation(path, clientForStoragePath(path), metrics);
+    return GCSInputFile.fromLocation(
+        path, clientForStoragePath(path), gcsFileSystemForStoragePath(path), metrics);
   }
 
   @Override
   public InputFile newInputFile(String path, long length) {
-    return GCSInputFile.fromLocation(path, length, clientForStoragePath(path), metrics);
+    return GCSInputFile.fromLocation(
+        path, length, clientForStoragePath(path), gcsFileSystemForStoragePath(path), metrics);
   }
 
   @Override
   public OutputFile newOutputFile(String path) {
-    return GCSOutputFile.fromLocation(path, clientForStoragePath(path), metrics);
+    return GCSOutputFile.fromLocation(
+        path, clientForStoragePath(path), gcsFileSystemForStoragePath(path), metrics);
   }
 
   @SuppressWarnings("resource")
@@ -128,6 +133,27 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
   @SuppressWarnings("resource")
   public Storage client(String storagePath) {
     return clientForStoragePath(storagePath).storage();
+  }
+
+  @VisibleForTesting
+  PrefixedGcsFileSystem gcsFileSystemForStoragePath(String storagePath) {
+    PrefixedGcsFileSystem gcsFileSystem;
+    String matchingPrefix = ROOT_STORAGE_PREFIX;
+
+    for (String storagePrefix : storageByPrefix().keySet()) {
+      if (storagePath.startsWith(storagePrefix)
+          && storagePrefix.length() > matchingPrefix.length()) {
+        matchingPrefix = storagePrefix;
+      }
+    }
+
+    gcsFileSystem = gcsFileSystemByPrefix().getOrDefault(matchingPrefix, null);
+
+    Preconditions.checkState(
+        null != gcsFileSystem,
+        "[BUG] GCS File System for storage path not available: %s",
+        storagePath);
+    return gcsFileSystem;
   }
 
   private PrefixedStorage clientForStoragePath(String storagePath) {
@@ -206,6 +232,38 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
     return storageByPrefix;
   }
 
+  private Map<String, PrefixedGcsFileSystem> gcsFileSystemByPrefix() {
+    if (null == gcsFileSystemByPrefix) {
+      synchronized (this) {
+        if (null == gcsFileSystemByPrefix) {
+          Map<String, PrefixedGcsFileSystem> localGcsFileSystemByPrefix = Maps.newHashMap();
+
+          localGcsFileSystemByPrefix.put(
+              ROOT_STORAGE_PREFIX, PrefixedGcsFileSystem.create(ROOT_STORAGE_PREFIX, properties));
+          storageCredentials.stream()
+              .filter(c -> c.prefix().startsWith(ROOT_STORAGE_PREFIX))
+              .collect(Collectors.toList())
+              .forEach(
+                  storageCredential -> {
+                    Map<String, String> propertiesWithCredentials =
+                        ImmutableMap.<String, String>builder()
+                            .putAll(properties)
+                            .putAll(storageCredential.config())
+                            .buildKeepingLast();
+
+                    localGcsFileSystemByPrefix.put(
+                        storageCredential.prefix(),
+                        PrefixedGcsFileSystem.create(
+                            storageCredential.prefix(), propertiesWithCredentials));
+                  });
+          this.gcsFileSystemByPrefix = localGcsFileSystemByPrefix;
+        }
+      }
+    }
+
+    return gcsFileSystemByPrefix;
+  }
+
   @Override
   public void close() {
     // handles concurrent calls to close()
@@ -213,6 +271,10 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
       if (storageByPrefix != null) {
         storageByPrefix.values().forEach(PrefixedStorage::close);
         this.storageByPrefix = null;
+      }
+      if (gcsFileSystemByPrefix != null) {
+        gcsFileSystemByPrefix.values().forEach(PrefixedGcsFileSystem::close);
+        this.gcsFileSystemByPrefix = null;
       }
     }
   }
