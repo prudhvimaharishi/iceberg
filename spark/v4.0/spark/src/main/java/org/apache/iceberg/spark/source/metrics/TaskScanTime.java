@@ -18,11 +18,14 @@
  */
 package org.apache.iceberg.spark.source.metrics;
 
-import java.text.NumberFormat;
-import java.util.Locale;
-import org.apache.spark.sql.connector.metric.CustomMetric;
+import org.apache.spark.sql.connector.metric.CustomTaskMetric;
 
-public class ScanTime implements CustomMetric {
+public class TaskScanTime implements CustomTaskMetric {
+  private final long value;
+
+  public TaskScanTime(long value) {
+    this.value = value;
+  }
 
   @Override
   public String name() {
@@ -30,17 +33,7 @@ public class ScanTime implements CustomMetric {
   }
 
   @Override
-  public String description() {
-    return "custom scan time of batch";
-  }
-
-  @Override
-  public String aggregateTaskMetrics(long[] taskMetrics) {
-    long sum = initialValue;
-    for (long taskMetric : taskMetrics) {
-      sum += taskMetric;
-    }
-
-    return NumberFormat.getIntegerInstance(Locale.ROOT).format(sum);
+  public long value() {
+    return value;
   }
 }
