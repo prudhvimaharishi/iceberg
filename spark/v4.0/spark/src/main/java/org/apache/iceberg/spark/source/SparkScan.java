@@ -48,6 +48,7 @@ import org.apache.iceberg.spark.source.metrics.NumSplits;
 import org.apache.iceberg.spark.source.metrics.PositionalDeleteFiles;
 import org.apache.iceberg.spark.source.metrics.ResultDataFiles;
 import org.apache.iceberg.spark.source.metrics.ResultDeleteFiles;
+import org.apache.iceberg.spark.source.metrics.ScanTime;
 import org.apache.iceberg.spark.source.metrics.ScannedDataManifests;
 import org.apache.iceberg.spark.source.metrics.ScannedDeleteManifests;
 import org.apache.iceberg.spark.source.metrics.SkippedDataFiles;
@@ -324,6 +325,7 @@ abstract class SparkScan implements Scan, SupportsReportStatistics {
       // task metrics
       new NumSplits(),
       new NumDeletes(),
+        new ScanTime(),
 
       // common
       new TotalPlanningDuration(),
