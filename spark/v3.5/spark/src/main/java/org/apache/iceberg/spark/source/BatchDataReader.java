@@ -18,7 +18,9 @@
  */
 package org.apache.iceberg.spark.source;
 
+import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.FileScanTask;
@@ -32,6 +34,7 @@ import org.apache.iceberg.spark.OrcBatchReadConf;
 import org.apache.iceberg.spark.ParquetBatchReadConf;
 import org.apache.iceberg.spark.source.metrics.TaskNumDeletes;
 import org.apache.iceberg.spark.source.metrics.TaskNumSplits;
+import org.apache.iceberg.spark.source.metrics.TaskScanTime;
 import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.spark.rdd.InputFileBlockHolder;
 import org.apache.spark.sql.connector.metric.CustomTaskMetric;
@@ -46,6 +49,7 @@ class BatchDataReader extends BaseBatchReader<FileScanTask>
   private static final Logger LOG = LoggerFactory.getLogger(BatchDataReader.class);
 
   private final long numSplits;
+  private long scanTimeAccumulator = 0;
 
   BatchDataReader(
       SparkInputPartition partition,
@@ -60,6 +64,7 @@ class BatchDataReader extends BaseBatchReader<FileScanTask>
         parquetBatchReadConf,
         orcBatchReadConf,
         partition.cacheDeleteFilesOnExecutors());
+    this.scanTimeAccumulator = 0;
   }
 
   BatchDataReader(
@@ -82,13 +87,16 @@ class BatchDataReader extends BaseBatchReader<FileScanTask>
         cacheDeleteFilesOnExecutors);
 
     numSplits = taskGroup.tasks().size();
+    this.scanTimeAccumulator = -1;
     LOG.debug("Reading {} file split(s) for table {}", numSplits, table.name());
   }
 
   @Override
   public CustomTaskMetric[] currentMetricsValues() {
     return new CustomTaskMetric[] {
-      new TaskNumSplits(numSplits), new TaskNumDeletes(counter().get())
+      new TaskNumSplits(numSplits),
+      new TaskNumDeletes(counter().get()),
+      new TaskScanTime(scanTimeAccumulator)
     };
   }
 
@@ -122,5 +130,16 @@ class BatchDataReader extends BaseBatchReader<FileScanTask>
             idToConstant,
             deleteFilter)
         .iterator();
+  }
+
+  @Override
+  public boolean next() throws IOException {
+    long startTime = System.nanoTime();
+    boolean hasNext;
+    hasNext = super.next();
+    long endTime = System.nanoTime();
+    long duration = endTime - startTime;
+    scanTimeAccumulator += TimeUnit.NANOSECONDS.toMillis(duration);
+    return hasNext;
   }
 }
