@@ -18,7 +18,14 @@
  */
 package org.apache.iceberg.spark.source;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import org.apache.iceberg.ScanTask;
 import org.apache.iceberg.ScanTaskGroup;
 import org.apache.iceberg.Schema;
@@ -26,12 +33,18 @@ import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.ThreadPools;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.connector.read.HasPartitionKey;
 import org.apache.spark.sql.connector.read.InputPartition;
 
 class SparkInputPartition implements InputPartition, HasPartitionKey, Serializable {
+  private static final ExecutorService WARMUP_EXECUTOR =
+      ThreadPools.newExitingWorkerPool("iceberg-partition-warmup", 8);
+  private static final Set<Long> WARMED_BROADCAST_IDS =
+      Collections.newSetFromMap(new ConcurrentHashMap<>());
+
   private final Types.StructType groupingKeyType;
   private final ScanTaskGroup<?> taskGroup;
   private final Broadcast<Table> tableBroadcast;
@@ -41,6 +54,7 @@ class SparkInputPartition implements InputPartition, HasPartitionKey, Serializab
   private final boolean caseSensitive;
   private final transient String[] preferredLocations;
   private final boolean cacheDeleteFilesOnExecutors;
+  private final boolean eagerWarmUpEnabled;
 
   private transient Schema expectedSchema = null;
 
@@ -54,6 +68,30 @@ class SparkInputPartition implements InputPartition, HasPartitionKey, Serializab
       boolean caseSensitive,
       String[] preferredLocations,
       boolean cacheDeleteFilesOnExecutors) {
+    this(
+        groupingKeyType,
+        taskGroup,
+        tableBroadcast,
+        fileIOBroadcast,
+        branch,
+        expectedSchemaString,
+        caseSensitive,
+        preferredLocations,
+        cacheDeleteFilesOnExecutors,
+        false);
+  }
+
+  SparkInputPartition(
+      Types.StructType groupingKeyType,
+      ScanTaskGroup<?> taskGroup,
+      Broadcast<Table> tableBroadcast,
+      Broadcast<FileIO> fileIOBroadcast,
+      String branch,
+      String expectedSchemaString,
+      boolean caseSensitive,
+      String[] preferredLocations,
+      boolean cacheDeleteFilesOnExecutors,
+      boolean eagerWarmUpEnabled) {
     this.groupingKeyType = groupingKeyType;
     this.taskGroup = taskGroup;
     this.tableBroadcast = tableBroadcast;
@@ -63,6 +101,36 @@ class SparkInputPartition implements InputPartition, HasPartitionKey, Serializab
     this.caseSensitive = caseSensitive;
     this.preferredLocations = preferredLocations;
     this.cacheDeleteFilesOnExecutors = cacheDeleteFilesOnExecutors;
+    this.eagerWarmUpEnabled = eagerWarmUpEnabled;
+  }
+
+  private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+    in.defaultReadObject();
+    if (eagerWarmUpEnabled
+        && fileIOBroadcast != null
+        && WARMED_BROADCAST_IDS.add(fileIOBroadcast.id())) {
+      Broadcast<FileIO> broadcastRef = fileIOBroadcast;
+      WARMUP_EXECUTOR.execute(() -> triggerFileIOWarmUp(broadcastRef));
+    }
+  }
+
+  private static void triggerFileIOWarmUp(Broadcast<FileIO> broadcastRef) {
+    ClassLoader previousLoader = Thread.currentThread().getContextClassLoader();
+    Thread.currentThread().setContextClassLoader(SparkInputPartition.class.getClassLoader());
+    try {
+      FileIO io = broadcastRef.value();
+      if (io instanceof SerializableFileIOWithSize wrapper) {
+        io = wrapper.delegate();
+      }
+      if (io != null) {
+        Method method = io.getClass().getMethod("startWarmUpAsync");
+        method.invoke(io);
+      }
+    } catch (ReflectiveOperationException | RuntimeException ignored) {
+      // Non-GCS FileIO implementations do not expose startWarmUpAsync.
+    } finally {
+      Thread.currentThread().setContextClassLoader(previousLoader);
+    }
   }
 
   @Override

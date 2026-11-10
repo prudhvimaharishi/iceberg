@@ -61,6 +61,10 @@ class SerializableFileIOWithSize
     return new SerializableFileIOWithSize(fileIO);
   }
 
+  FileIO delegate() {
+    return fileIO;
+  }
+
   @Override
   public void close() {
     if (null == serializationMarker) {

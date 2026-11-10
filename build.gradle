@@ -121,12 +121,16 @@ allprojects {
       }
       filter {
         includeGroup "com.google.cloud.gcs.analytics"
-        includeModule "com.google.cloud", "google-cloud-storage"
-        includeModule "com.google.cloud", "google-cloud-storage-bom"
-        includeModule "com.google.api", "gax"
-        includeModule "com.google.api", "gax-grpc"
-        includeModule "com.google.api", "gax-httpjson"
-        includeModule "com.google.api", "gax-bom"
+        includeVersion "com.google.cloud", "google-cloud-storage", "2.78.0"
+        includeVersion "com.google.cloud", "google-cloud-storage-bom", "2.78.0"
+        includeVersion "com.google.cloud", "google-cloud-storage-control", "2.78.0"
+        includeVersion "com.google.api.grpc", "gapic-google-cloud-storage-v2", "2.78.0-alpha"
+        includeVersion "com.google.api.grpc", "grpc-google-cloud-storage-v2", "2.78.0-alpha"
+        includeVersion "com.google.api.grpc", "proto-google-cloud-storage-v2", "2.78.0-alpha"
+        includeVersion "com.google.api", "gax", "2.90.0"
+        includeVersion "com.google.api", "gax-grpc", "2.90.0"
+        includeVersion "com.google.api", "gax-httpjson", "2.90.0"
+        includeVersion "com.google.api", "gax-bom", "2.90.0"
       }
     }
     mavenCentral()

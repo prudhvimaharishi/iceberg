@@ -325,7 +325,7 @@ abstract class SparkScan implements Scan, SupportsReportStatistics {
       // task metrics
       new NumSplits(),
       new NumDeletes(),
-        new ScanTime(),
+      new ScanTime(),
 
       // common
       new TotalPlanningDuration(),
