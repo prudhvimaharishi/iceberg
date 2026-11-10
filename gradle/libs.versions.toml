@@ -53,7 +53,7 @@ flink21 = { strictly = "2.1.0"}
 flink22 = { strictly = "2.2.0"}
 flink23 = { strictly = "2.3.0"}
 google-libraries-bom = "26.88.0"
-gcs-analytics-core = "1.5.1-SNAPSHOT"
+gcs-analytics-core = "1.7.1-WARMUP-SNAPSHOT"
 guava = "33.7.1-jre"
 hadoop3 = "3.4.3"
 httpcomponents-httpclient5 = "5.6.4"
