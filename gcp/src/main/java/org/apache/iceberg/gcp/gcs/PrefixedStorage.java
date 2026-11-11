@@ -44,6 +44,8 @@ class PrefixedStorage implements AutoCloseable {
   private final Map<String, String> propertiesWithUserAgent;
   private SerializableSupplier<Storage> storage;
   private CloseableGroup closeableGroup;
+  private final Object storageLock = new Object();
+  private final Object fileSystemLock = new Object();
   private transient volatile Storage storageClient;
   private transient volatile AutoCloseable gcsFileSystem;
 
@@ -90,7 +92,7 @@ class PrefixedStorage implements AutoCloseable {
 
   public Storage storage() {
     if (null == storageClient) {
-      synchronized (this) {
+      synchronized (storageLock) {
         if (null == storageClient) {
           this.storageClient = storage.get();
         }
@@ -135,7 +137,7 @@ class PrefixedStorage implements AutoCloseable {
     }
 
     if (gcsFileSystem == null) {
-      synchronized (this) {
+      synchronized (fileSystemLock) {
         if (gcsFileSystem == null) {
           this.gcsFileSystem =
               AnalyticsCoreUtil.createFileSystem(

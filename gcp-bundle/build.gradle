@@ -31,13 +31,19 @@ project(":iceberg-gcp-bundle") {
   }
 
   dependencies {
+    implementation platform("com.google.cloud:google-cloud-core-bom:2.80.0")
+    implementation platform("com.google.auth:google-auth-library-bom:1.57.0")
+    implementation platform("com.google.api:gax-bom:2.90.0")
+    implementation platform("com.google.cloud:google-cloud-storage-bom:2.78.0")
     implementation platform(libs.google.libraries.bom)
     // Align the shaded Jackson to the project version; the Google libraries BOM
     // otherwise pulls in an older jackson-databind with known CVEs.
     implementation platform(libs.jackson.bom)
-    implementation "com.google.cloud:google-cloud-storage"
+    implementation "com.google.cloud:google-cloud-storage:2.78.0"
+    implementation "com.google.api:gax:2.90.0"
+    implementation "com.google.api:gax-grpc:2.90.0"
     implementation "com.google.cloud:google-cloud-bigquery"
-    implementation "com.google.cloud:google-cloud-core"
+    implementation "com.google.cloud:google-cloud-core:2.80.0"
     implementation "com.google.cloud:google-cloud-kms"
     implementation libs.gcs.analytics.core
   }
@@ -45,6 +51,7 @@ project(":iceberg-gcp-bundle") {
   shadowJar {
     archiveClassifier.set(null)
     zip64 true
+    mergeServiceFiles()
 
     // relocate GCP-specific versions
     relocate 'com.fasterxml.jackson', 'org.apache.iceberg.gcp.shaded.com.fasterxml.jackson'

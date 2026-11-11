@@ -33,9 +33,9 @@ import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.spark.OrcBatchReadConf;
 import org.apache.iceberg.spark.ParquetBatchReadConf;
-import org.apache.iceberg.spark.source.metrics.TaskScanTime;
 import org.apache.iceberg.spark.source.metrics.TaskNumDeletes;
 import org.apache.iceberg.spark.source.metrics.TaskNumSplits;
+import org.apache.iceberg.spark.source.metrics.TaskScanTime;
 import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.spark.rdd.InputFileBlockHolder;
 import org.apache.spark.sql.connector.metric.CustomTaskMetric;
@@ -51,7 +51,8 @@ class BatchDataReader extends BaseBatchReader<FileScanTask>
 
   private final long numSplits;
   private long scanTimeAccumulator = 0;
-//  TaskContext context = TaskContext.get();
+
+  //  TaskContext context = TaskContext.get();
 
   BatchDataReader(
       SparkInputPartition partition,
@@ -99,7 +100,9 @@ class BatchDataReader extends BaseBatchReader<FileScanTask>
   @Override
   public CustomTaskMetric[] currentMetricsValues() {
     return new CustomTaskMetric[] {
-      new TaskNumSplits(numSplits), new TaskNumDeletes(counter().get()), new TaskScanTime(scanTimeAccumulator)
+      new TaskNumSplits(numSplits),
+      new TaskNumDeletes(counter().get()),
+      new TaskScanTime(scanTimeAccumulator)
     };
   }
 
@@ -146,7 +149,8 @@ class BatchDataReader extends BaseBatchReader<FileScanTask>
     long endTime = System.nanoTime();
     long duration = endTime - startTime;
 
-    scanTimeAccumulator+= TimeUnit.NANOSECONDS.toMillis(duration);;
+    scanTimeAccumulator += TimeUnit.NANOSECONDS.toMillis(duration);
+    ;
     return hasNext;
   }
 }

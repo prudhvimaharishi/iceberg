@@ -95,8 +95,16 @@ class SparkBatch implements Batch {
     // broadcast the table metadata as input partitions will be sent to executors
     Broadcast<Table> tableBroadcast =
         sparkContext.broadcast(SerializableTableWithSize.copyOf(table));
+    FileIO rawFileIO = fileIO.get();
+    boolean eagerWarmUpEnabled =
+        rawFileIO != null
+            && rawFileIO.properties() != null
+            && Boolean.parseBoolean(
+                rawFileIO
+                    .properties()
+                    .getOrDefault("gcs.client.grpc.warmup.eager-init.enabled", "false"));
     Broadcast<FileIO> fileIOBroadcast =
-        sparkContext.broadcast(SerializableFileIOWithSize.wrap(fileIO.get()));
+        sparkContext.broadcast(SerializableFileIOWithSize.wrap(rawFileIO));
     String expectedSchemaString = SchemaParser.toJson(expectedSchema);
     String[][] locations = computePreferredLocations();
 
@@ -113,7 +121,8 @@ class SparkBatch implements Batch {
               expectedSchemaString,
               caseSensitive,
               locations != null ? locations[index] : SparkPlanningUtil.NO_LOCATION_PREFERENCE,
-              cacheDeleteFilesOnExecutors);
+              cacheDeleteFilesOnExecutors,
+              eagerWarmUpEnabled);
     }
 
     return partitions;

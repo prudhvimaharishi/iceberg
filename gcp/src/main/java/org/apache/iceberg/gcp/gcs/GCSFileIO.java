@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -74,7 +75,9 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
   private static final String DEFAULT_METRICS_IMPL =
       "org.apache.iceberg.hadoop.HadoopMetricsContext";
   private static final String ROOT_STORAGE_PREFIX = "gs";
+  private static final String EAGER_WARMUP_ENABLED = "gcs.client.grpc.warmup.eager-init.enabled";
   private static volatile ScheduledExecutorService executorService;
+  private static volatile ExecutorService warmUpExecutor;
 
   private SerializableSupplier<Storage> storageSupplier;
   private MetricsContext metrics = MetricsContext.nullMetrics();
@@ -84,6 +87,7 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
   private volatile List<StorageCredential> storageCredentials = Lists.newArrayList();
   private transient volatile Map<String, PrefixedStorage> storageByPrefix;
   private transient volatile ScheduledFuture<?> refreshFuture;
+  private transient volatile boolean warmUpStarted = false;
 
   /**
    * No-arg constructor to load the FileIO dynamically.
@@ -164,6 +168,44 @@ public class GCSFileIO implements DelegateFileIO, SupportsStorageCredentials {
   public void initialize(Map<String, String> props) {
     this.properties = SerializableMap.copyOf(props);
     initMetrics(properties);
+    startWarmUpAsync();
+  }
+
+  public void startWarmUpAsync() {
+    if (warmUpStarted
+        || properties == null
+        || isResourceClosed.get()
+        || !Boolean.parseBoolean(properties.getOrDefault(EAGER_WARMUP_ENABLED, "false"))) {
+      return;
+    }
+    synchronized (this) {
+      if (warmUpStarted) {
+        return;
+      }
+      this.warmUpStarted = true;
+    }
+    warmUpExecutor()
+        .execute(
+            () -> {
+              if (!isResourceClosed.get()) {
+                try {
+                  storageByPrefix().values().forEach(PrefixedStorage::gcsFileSystem);
+                } catch (RuntimeException e) {
+                  LOG.warn("Asynchronous GCSFileIO warm-up failed", e);
+                }
+              }
+            });
+  }
+
+  private static ExecutorService warmUpExecutor() {
+    if (warmUpExecutor == null) {
+      synchronized (GCSFileIO.class) {
+        if (warmUpExecutor == null) {
+          warmUpExecutor = ThreadPools.newExitingWorkerPool("iceberg-gcsfileio-warmup", 8);
+        }
+      }
+    }
+    return warmUpExecutor;
   }
 
   @SuppressWarnings("CatchBlockLogException")

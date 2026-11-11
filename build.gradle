@@ -115,6 +115,24 @@ allprojects {
   group = "org.apache.iceberg"
   version = projectVersion
   repositories {
+    exclusiveContent {
+      forRepository {
+        mavenLocal()
+      }
+      filter {
+        includeGroup "com.google.cloud.gcs.analytics"
+        includeVersion "com.google.cloud", "google-cloud-storage", "2.78.0"
+        includeVersion "com.google.cloud", "google-cloud-storage-bom", "2.78.0"
+        includeVersion "com.google.cloud", "google-cloud-storage-control", "2.78.0"
+        includeVersion "com.google.api.grpc", "gapic-google-cloud-storage-v2", "2.78.0-alpha"
+        includeVersion "com.google.api.grpc", "grpc-google-cloud-storage-v2", "2.78.0-alpha"
+        includeVersion "com.google.api.grpc", "proto-google-cloud-storage-v2", "2.78.0-alpha"
+        includeVersion "com.google.api", "gax", "2.90.0"
+        includeVersion "com.google.api", "gax-grpc", "2.90.0"
+        includeVersion "com.google.api", "gax-httpjson", "2.90.0"
+        includeVersion "com.google.api", "gax-bom", "2.90.0"
+      }
+    }
     mavenCentral()
     mavenLocal()
   }
@@ -779,6 +797,10 @@ project(':iceberg-gcp') {
     implementation project(':iceberg-common')
     implementation project(':iceberg-core')
 
+    compileOnly platform("com.google.cloud:google-cloud-core-bom:2.80.0")
+    compileOnly platform("com.google.auth:google-auth-library-bom:1.57.0")
+    compileOnly platform("com.google.api:gax-bom:2.90.0")
+    compileOnly platform("com.google.cloud:google-cloud-storage-bom:2.78.0")
     compileOnly platform(libs.google.libraries.bom)
     compileOnly "com.google.cloud:google-cloud-storage"
     compileOnly "com.google.cloud:google-cloud-kms"
